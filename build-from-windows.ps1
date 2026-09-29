@@ -84,7 +84,8 @@ try {
         }
     }
 
-    $remote = git remote get-url origin 2>$null
+    $remoteNames = @(git remote)
+    $remote = if ($remoteNames -contains 'origin') { git remote get-url origin } else { $null }
     if (-not $remote) {
         gh repo view $Repository --json nameWithOwner 1>$null 2>$null
         if ($LASTEXITCODE -eq 0) {
