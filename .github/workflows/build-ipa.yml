@@ -20,7 +20,7 @@ jobs:
 
     steps:
       - name: Check out source
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Show Apple toolchain
         run: |
@@ -59,7 +59,7 @@ jobs:
           shasum -a 256 AirCard-iOS.ipa | tee AirCard-iOS.ipa.sha256
 
       - name: Upload IPA artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: AirCard-iOS-26.4-unsigned
           path: |
@@ -78,7 +78,7 @@ jobs:
 
     steps:
       - name: Download the exact build artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: AirCard-iOS-26.4-unsigned
           path: build
