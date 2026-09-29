@@ -1,136 +1,181 @@
-# AirCard-iOS
+# AirCard-iOS 26.4
 
 <p align="center">
-  <img src="ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="128" height="128" alt="AirCard-iOS Icon" style="border-radius: 28px; box-shadow: 0 8px 24px rgba(0,0,0,0.18);" />
+  <img src="ios-app/Assets.xcassets/AppIcon.appiconset/AppIcon.png" width="128" height="128" alt="AirCard-iOS icon" />
+</p>
+
+<p align="center">Experimental iOS 26.4 support for changing local Apple Wallet artwork, passcode themes, and PosterBoard wallpapers without a jailbreak.</p>
+
+<p align="center">
+  <a href="README.zh-CN.md">简体中文</a> · <strong>English</strong> ·
+  <a href="https://rnadow.github.io/aircard/">Project site</a> ·
+  <a href="https://rnadow.top/posts/aircard-ios-26-4-windows-build/">Build notes</a>
 </p>
 
 <p align="center">
-  Apple Wallet card skins, lock screen passcode themes, and PosterBoard wallpapers directly on iOS 27+.
+  <img src="https://img.shields.io/badge/Tested-iOS%2026.4-blue?style=flat-square&logo=apple" alt="Tested on iOS 26.4" />
+  <img src="https://img.shields.io/badge/Release-v1.3.3-6f42c1?style=flat-square" alt="Release v1.3.3" />
+  <img src="https://img.shields.io/badge/Swift-5.0-orange?style=flat-square&logo=swift" alt="Swift 5" />
+  <img src="https://img.shields.io/badge/Rust-FFI%20Core-red?style=flat-square&logo=rust" alt="Rust FFI core" />
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License" />
 </p>
 
-<p align="center">
-  <img src="https://img.shields.io/badge/Platform-iOS%2027+-blue?style=flat-square&logo=apple" alt="Platform" />
-  <img src="https://img.shields.io/badge/Swift-5.0-orange?style=flat-square&logo=swift" alt="Swift" />
-  <img src="https://img.shields.io/badge/Rust-FFI%20Core-red?style=flat-square&logo=rust" alt="Rust" />
-  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="License" />
-  <a href="https://www.paypal.com/donate/?hosted_button_id=98QRTC2HFRA4Y"><img src="https://img.shields.io/badge/Donate-PayPal-00457C?style=flat-square&logo=paypal" alt="Donate with PayPal" /></a>
-</p>
+> [!WARNING]
+> This is an experimental research build, not a promise of compatibility with every device or iOS build. Run the compatibility probe before touching Wallet. Make a backup and proceed at your own risk.
 
-## Overview
+## What this fork adds
 
-AirCard-iOS customizes Apple Wallet card artwork, lock screen passcode dialers, and lock screen wallpapers on device without a jailbreak.
+This fork keeps the upstream AirCard feature set and adds an iOS 26.4 validation and recovery path:
 
-The app communicates with internal system services over a local loopback tunnel (`10.7.0.1` or `127.0.0.1`) provided by LocalDevVPN. File operations are handled by `AirliftFFI`, a Rust library that interfaces with the AirTraffic service.
+- an on-device compatibility probe that tests loopback, pairing, AFC, AirTraffic traversal, exact-byte readback, and cleanup without modifying Wallet;
+- importing trusted pairing records in `.plist`, `.mobiledevicepairing`, or `.mobilepair` format when Developer Mode does not show an authorization prompt;
+- focused-card detection for Wallets containing many cards: the card currently opened in Wallet receives a green **CURRENT CARD** badge and is the only card selected for flashing;
+- local bank and last-four labels, stored on the device, so detected hashes can be recognized later;
+- a Windows launcher that pushes the source, runs the macOS GitHub Actions build, downloads the unsigned IPA, and verifies its SHA-256 checksum.
 
-> **Compatibility**: AirCard-iOS currently requires **iOS 27.0 or newer (iOS 27+)**.
+The current package is **v1.3.3 (2643)**. A verified unsigned build is produced as `build/AirCard-iOS.ipa`.
 
 ## Features
 
-### Apple Wallet card skins
-- Writes custom card artwork to Passbook caches (`cardBackgroundCombined@3x.png`, `@2x.png`, and `cardBackgroundCombined.pdf` for transit cards like Suica).
-- Flushes front-face and thumbnail caches so new artwork appears immediately when Wallet opens.
-- Detects card identifiers in real time when you bring up Apple Pay.
-- Apply artwork to individual cards or batch-flash every detected card.
+### Wallet artwork
 
-### Passcode dialer themes
-- Live dialer preview with touch panning and zoom framing.
-- Full poster layout across all ten buttons, or individual circular button cutouts.
-- Targets system dialer caches (`TelephonyUI-10`).
-- Localized number subtext options, including Ukrainian and Russian Cyrillic layouts.
-- Import and export themes as `.passthm` files.
+- Replaces local artwork caches for individual Apple Wallet cards.
+- Supports PNG artwork and the PDF cache used by some transit cards.
+- Detects card identifiers from device logs while Wallet is open.
+- Supports one-card selection or batch flashing.
 
-### PosterBoard wallpapers (.tendies)
-- Import and unpack `.tendies` wallpaper archives directly from the Files app.
-- Auto-detects PosterBoard wallpaper containers and active descriptor UUIDs.
-- Injects wallpaper configurations and assets into PosterBoard storage.
-- Automatically triggers a NeoSpring respring after flashing to apply wallpapers without rebooting your iPhone.
+### Multi-card workflow
 
-### On-device pairing
-- Advertises locally over Bonjour so the phone can pair with itself via Settings > Privacy & Security > Developer Mode > Pair with AirCard-iOS.
-- Reads and syncs pairing records automatically into `aircard_pairing.plist`.
-- Once paired, no computer or external connection is needed.
+When Wallet contains many cards, a generic scan can enumerate several identifiers. Do not choose a hash only because it appeared most recently.
 
-## Prerequisites
+1. In AirCard, start the Wallet card scan.
+2. Open Wallet and tap the exact card you want to customize.
+3. Wait until AirCard marks one entry with the green **CURRENT CARD** badge.
+4. Optionally rename it with the bank name and last four digits; the label is local only.
+5. Assign the artwork and flash only that selected card.
 
-1. **iOS 27+**: The exploit and paths currently target iOS 27.0 and above.
-2. **LocalDevVPN**: Running in loopback mode (`10.7.0.1` or `127.0.0.1`) so local connections can reach internal device services.
-3. **Developer Mode pairing**: Pair directly in Settings > Privacy & Security > Developer Mode > Pair with AirCard-iOS, or place an existing pairing plist in the app's documents directory.
+### Passcode and wallpaper themes
+
+- Live passcode dialer preview, framing, full-poster layout, and individual button cutouts.
+- Import and export of `.passthm` themes.
+- Import and injection of `.tendies` PosterBoard wallpapers.
+- NeoSpring-based respring after wallpaper changes.
+
+## Requirements
+
+- An iPhone running the tested iOS 26.4 environment.
+- A working loopback VPN such as LocalDevVPN or SideStore WireGuard.
+- A trusted Remote Pairing record generated for this iPhone.
+- A signing and sideloading method you control.
+
+> [!IMPORTANT]
+> A `.p12` file is a signing certificate, not a device pairing record. AirCard imports `.plist`, `.mobiledevicepairing`, or `.mobilepair` pairing files. Never publish a pairing record, certificate, UDID, card hash, or full diagnostic log.
+
+## Pairing and first run
+
+### Option A: pair on device
+
+Open AirCard's **Pairing** tab, tap **Pair This iPhone**, then approve the request under **Settings → Privacy & Security → Developer Mode** if iOS shows it.
+
+### Option B: import an existing pairing record
+
+If iOS 26 does not display the pairing prompt, export a trusted pairing record from a Mac or an existing SideStore/iLoader setup, then use **Import Pairing Record** in AirCard. One working iLoader sequence is:
+
+1. **Delete Stored Pairing**.
+2. Reconnect the iPhone and tap **Trust** when prompted.
+3. Open **Manage Pairing File** and choose **Place**.
+4. Import the resulting pairing file into AirCard.
+
+Start the loopback VPN before connecting. An error such as `failed to parse raw pairing file from bytes` usually means the wrong file type was selected or the loopback tunnel was not active.
+
+### Run the safe probe
+
+Before changing Wallet, run **iOS 26.4 Compatibility → Run iOS 26.4 Probe**. The probe writes a randomized canary under `/var/mobile/Library/Caches`, reads and verifies the exact bytes through AirTraffic, and removes its temporary objects. It does not write to Passbook or Wallet.
+
+Only proceed after every probe stage is green.
 
 ## Installation
 
-Install `AirCard-iOS.ipa` using your preferred sideloading method:
+The IPA produced by this repository is unsigned. Sign and install it using SideStore, AltStore, TrollStore, LiveContainer, Xcode, or another method you control.
 
-- SideStore or AltStore
-- TrollStore
-- LiveContainer
-- Xcode or iOS App Signer
+## Build from Windows
 
-## Building from source
+Windows cannot run Apple's iOS SDK locally, so the included script delegates compilation to a macOS GitHub Actions runner.
 
-### Requirements
-- macOS 14.0 or newer with Xcode 16 or newer
-- XcodeGen (`brew install xcodegen`)
-- Rust toolchain (only needed if rebuilding `rust-core`)
+### 1. Install and authenticate GitHub CLI
 
-### Build the IPA
+```powershell
+winget install --id GitHub.cli
+gh auth login
+```
+
+Open a new PowerShell window if `gh` is not recognized.
+
+### 2. Run the build
+
+```powershell
+Set-Location "C:\Projects\AirCard-iOS-26.4"
+powershell -ExecutionPolicy Bypass -File .\build-from-windows.ps1 -Repository "rnadow/aircard"
+```
+
+Do not append a PowerShell backtick to the one-line command. The output is downloaded to:
+
+```text
+build/AirCard-iOS.ipa
+build/AirCard-iOS.ipa.sha256
+```
+
+If Git reports `detected dubious ownership`, trust this repository only:
+
+```powershell
+git config --global --add safe.directory "H:/CWD/Documents/ChatGPT/个人/AirCard-iOS-26.4"
+```
+
+### Build on macOS
+
+Requirements: macOS 14+, Xcode 16+, and XcodeGen.
+
 ```bash
-git clone https://github.com/mak5er/AirCard-iOS.git
-cd AirCard-iOS
+brew install xcodegen
+git clone https://github.com/rnadow/aircard.git
+cd aircard
 ./build-ipa.sh
 ```
 
-The completed package is written to `build/AirCard-iOS.ipa`.
+Rebuild the Rust framework only when modifying `rust-core`:
 
-### Rebuilding the Rust framework
-To compile changes in `rust-core`:
 ```bash
 ./build-ios.sh
 ```
 
-## Repository structure
+## Repository layout
 
+```text
+AirCard-iOS-26.4/
+├── ios-app/                 SwiftUI app
+├── rust-core/               Airlift/AirTraffic Rust core
+├── project.yml              XcodeGen configuration
+├── build-ipa.sh             macOS IPA build
+├── build-ios.sh             Rust framework build
+├── build-from-windows.ps1   Windows → GitHub Actions workflow
+├── build-ipa.yml            GitHub Actions workflow source
+└── docs/                    GitHub Pages project site
 ```
-AirCard-iOS/
-├── ios-app/                   # SwiftUI application
-│   ├── AirCardApp.swift       # App entry point and lifecycle
-│   ├── AppViewModel.swift     # State management and exploit orchestration
-│   ├── ContentView.swift      # Main UI views
-│   ├── TendiesView.swift      # PosterBoard wallpaper view
-│   ├── TendiesEngine.swift    # Tendies extraction and injection logic
-│   ├── RespringHelper.swift   # NeoSpring WebKit respring implementation
-│   ├── Models.swift           # Image slicing, theme layout, archive packing
-│   ├── PairingController.swift# Bonjour host and pairing sync
-│   ├── NetworkStatus.swift    # VPN loopback detection
-│   ├── Utilities.swift        # Background keep-alive and helper functions
-│   ├── GrappaHelper.[h,m]     # ATC protocol helpers
-│   ├── Info.plist             # Bundle configuration
-│   └── Assets.xcassets/       # App icons and image sets
-├── AirliftFFI.xcframework/    # Compiled arm64 Rust static library and headers
-├── rust-core/                 # Rust core source code
-├── project.yml                # XcodeGen project definition
-├── build-ipa.sh               # IPA build script
-├── build-ios.sh               # Rust framework build script
-├── LICENSE                    # MIT License
-└── README.md                  # Project documentation
-```
+
+## Security and limitations
+
+- This project changes local visual cache files; it does not change payment credentials, balances, issuer data, or the Secure Element.
+- Pairing records authenticate a host to a specific device. Keep them private and remove them before sharing logs or archives.
+- The compatibility probe reduces risk but cannot guarantee that all flashing paths are safe on every build.
+- Test one card and one disposable artwork first. Avoid batch flashing until the exact target is confirmed.
 
 ## Credits
 
-- **[@mak5er](https://github.com/mak5er)**: Lead developer, UI, passcode theming, Tendies engine, on-device pairing.
-- **[@merybist](https://github.com/merybist)**: Initial base port.
-- **[AirLift](https://github.com/0xjohnnydev/airlift)** by **[0xjohnny (@0xjohnnydev)](https://github.com/0xjohnnydev)**: AirTraffic and ATAirlock sandbox escape research underlying `AirliftFFI`.
-- **[NeoSpring](https://github.com/rooootdev/neospring)**: Swift implementation by **[@skadz108](https://github.com/skadz108)** and **[@rooootdev](https://github.com/rooootdev)**, and **[@neonmodder123](https://github.com/neonmodder123)** for the WebKit GPU process respring technique.
-- Built upon concepts from the **AirCard** project.
-
-## Support
-
-If you want to support AirCard-iOS development:
-
-- **PayPal**: [Donate via PayPal](https://www.paypal.com/donate/?hosted_button_id=98QRTC2HFRA4Y)
-- **TON**: `UQBm9KPhtMw-XVVjirUoa09wzrlyWsbeZhKfefl1Uw-qNZ-r`
-- **USDT (TRC20)**: `TDkDMCyjYxgvkWUnQiF5Erk2RyPQMT6G1n`
-- **USDT / BNB (BEP20)**: `0x0954dc491c502849d04956ef74634aa5931a08e8`
+- [@mak5er](https://github.com/mak5er) — upstream AirCard-iOS, UI, passcode theming, Tendies engine, and pairing work.
+- [@merybist](https://github.com/merybist) — initial base port.
+- [AirLift](https://github.com/0xjohnnydev/airlift) by [@0xjohnnydev](https://github.com/0xjohnnydev) — AirTraffic and ATAirlock research underlying `AirliftFFI`.
+- [NeoSpring](https://github.com/rooootdev/neospring) — respring implementation and related research.
 
 ## License
 
-MIT License. See [LICENSE](LICENSE) for details.
+MIT. See [LICENSE](LICENSE).
