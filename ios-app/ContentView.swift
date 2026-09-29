@@ -401,6 +401,7 @@ struct PairingTab: View {
     @EnvironmentObject var vm: AppViewModel
     @State private var showDeleteConfirm = false
     @State private var showCredits = false
+    @State private var showPairingImporter = false
 
     var body: some View {
         NavigationStack {
@@ -415,7 +416,7 @@ struct PairingTab: View {
                             Text("AirCard-iOS")
                                 .font(.title2.bold())
                             Spacer()
-                            Text("iOS \(ProcessInfo.processInfo.operatingSystemVersion.majorVersion) · v1.3.1-26.4")
+                            Text("iOS \(ProcessInfo.processInfo.operatingSystemVersion.majorVersion) · v1.3.2-26.4")
                                 .font(.caption.monospaced().bold())
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.blue.opacity(0.12))
@@ -528,6 +529,40 @@ struct PairingTab: View {
                     Button("Cancel", role: .cancel) {}
                 } message: {
                     Text("The active pairing credentials will be removed.")
+                }
+
+                if ProcessInfo.processInfo.operatingSystemVersion.majorVersion < 27 {
+                    Section("iOS 26 Pairing Fallback") {
+                        VStack(alignment: .leading, spacing: 10) {
+                            Label("Developer Mode may not show the on-device pairing request on iOS 26.",
+                                  systemImage: "exclamationmark.triangle.fill")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.orange)
+
+                            Text("Generate or export a trusted pairing record on your Mac, then import the .plist, .mobiledevicepairing, or .mobilepair file here. Pairing credentials stay inside this app's Documents container.")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+
+                            Button {
+                                showPairingImporter = true
+                            } label: {
+                                Label(vm.hasPairingFile ? "Replace Pairing Record" : "Import Pairing Record",
+                                      systemImage: "doc.badge.plus")
+                                    .font(.headline)
+                                    .frame(maxWidth: .infinity)
+                                    .frame(height: 42)
+                            }
+                            .buttonStyle(.borderedProminent)
+
+                            if !vm.documentsPlistFiles.isEmpty {
+                                Text("Available in Documents: \(vm.documentsPlistFiles.joined(separator: ", "))")
+                                    .font(.caption2.monospaced())
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                            }
+                        }
+                        .padding(.vertical, 4)
+                    }
                 }
 
                 // On-Device Pairing Section (available for all iOS versions)
@@ -670,6 +705,15 @@ struct PairingTab: View {
             }
             .sheet(isPresented: $showCredits) {
                 CreditsSheet()
+            }
+            .sheet(isPresented: $showPairingImporter) {
+                DocumentPickerView(allowedContentTypes: [.propertyList, .data]) { url in
+                    let imported = vm.importPairingFile(from: url, originalName: url.lastPathComponent)
+                    if !imported {
+                        vm.errorMessage = "The selected pairing record could not be read or was empty."
+                    }
+                    showPairingImporter = false
+                }
             }
             .onAppear {
                 vm.refreshNetworkStatus()

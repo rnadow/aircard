@@ -49,6 +49,15 @@ TrollStore, LiveContainer, Xcode, or another signing method you control.
 This is an experimental research build. It changes local artwork caches only;
 it does not alter payment credentials or bank-side card data.
 
+### iOS 26 pairing fallback
+
+Some iOS 26 builds do not expose the on-device pairing request under Developer
+Mode. Version 1.3.2 adds an **Import Pairing Record** action to the Pairing tab.
+Generate/export a trusted record on the user's Mac or from an existing
+sideloading setup, then select its `.plist`, `.mobiledevicepairing`, or
+`.mobilepair` file. Pairing records are device credentials and must never be
+published, committed, or shared with other people.
+
 ## Start the build from Windows
 
 Windows cannot run Apple's iOS SDK or `xcodebuild` locally. The included

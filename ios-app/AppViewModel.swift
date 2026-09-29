@@ -292,8 +292,10 @@ final class AppViewModel: ObservableObject {
     }
 
     func deletePairingFile() {
-        let path = PairingController.pairingFilePath()
-        try? FileManager.default.removeItem(atPath: path)
+        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        for name in ["aircard_pairing.plist", "airlift_pairing.plist"] {
+            try? FileManager.default.removeItem(at: docs.appendingPathComponent(name))
+        }
         PairingController.customPairingFilePath = nil
         refreshPairingFile()
         pairingStatus = "Pairing file deleted"
