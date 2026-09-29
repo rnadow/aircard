@@ -121,6 +121,10 @@ build/AirCard-iOS.ipa.sha256
 git config --global --add safe.directory "H:/CWD/Documents/ChatGPT/个人/AirCard-iOS-26.4"
 ```
 
+### 自动生成 Pre-release
+
+维护者可以推送格式严格为 `v<MARKETING_VERSION>-ios26.4` 的 tag。GitHub Actions 会先核对 tag 与 `project.yml` 中的版本号，再只构建一次无签名 IPA，将同一个 workflow artifact 传递给发布任务，并自动生成带版本号的 IPA 与 SHA-256 附件。版本不匹配时会在发布前失败。
+
 ### 在 macOS 上构建
 
 需要 macOS 14+、Xcode 16+ 与 XcodeGen。
@@ -154,6 +158,7 @@ AirCard-iOS-26.4/
 
 ## 安全说明与限制
 
+- 本仓库是独立的实验性适配，并非上游官方二进制发布。v1.3.2 与 v1.3.3 为兼容原地升级，暂时保留上游的 `com.mak5er.aircard` Bundle ID；更换 Bundle ID 属于应用身份迁移，将作为不兼容升级单独发布。
 - 本项目修改的是本地视觉缓存，不会修改支付凭据、余额、发卡行数据或 Secure Element。
 - 配对文件可以让特定主机认证当前设备，必须妥善保管；分享日志或压缩包前应先删除。
 - 探针可以降低风险，但无法保证所有 iOS 构建上的全部写入路径都安全。

@@ -131,6 +131,10 @@ If Git reports `detected dubious ownership`, trust this repository only:
 git config --global --add safe.directory "H:/CWD/Documents/ChatGPT/个人/AirCard-iOS-26.4"
 ```
 
+### Automated pre-releases
+
+Maintainers can push a tag in the exact form `v<MARKETING_VERSION>-ios26.4`. GitHub Actions validates the tag against `project.yml`, builds the unsigned IPA once, carries that same workflow artifact into the release job, and publishes versioned IPA and SHA-256 assets automatically. A mismatched tag fails before publication.
+
 ### Build on macOS
 
 Requirements: macOS 14+, Xcode 16+, and XcodeGen.
@@ -164,6 +168,7 @@ AirCard-iOS-26.4/
 
 ## Security and limitations
 
+- This repository is an independent experimental adaptation, not an official upstream binary distribution. Versions 1.3.2 and 1.3.3 retain the upstream `com.mak5er.aircard` bundle identifier for in-place compatibility; changing that identifier is an app-identity migration and will be released separately as an incompatible upgrade.
 - This project changes local visual cache files; it does not change payment credentials, balances, issuer data, or the Secure Element.
 - Pairing records authenticate a host to a specific device. Keep them private and remove them before sharing logs or archives.
 - The compatibility probe reduces risk but cannot guarantee that all flashing paths are safe on every build.
