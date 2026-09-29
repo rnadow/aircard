@@ -416,7 +416,7 @@ struct PairingTab: View {
                             Text("AirCard-iOS")
                                 .font(.title2.bold())
                             Spacer()
-                            Text("iOS \(ProcessInfo.processInfo.operatingSystemVersion.majorVersion) · v1.3.2-26.4")
+                            Text("iOS \(ProcessInfo.processInfo.operatingSystemVersion.majorVersion) · v1.3.3-26.4")
                                 .font(.caption.monospaced().bold())
                                 .padding(.horizontal, 8).padding(.vertical, 3)
                                 .background(Color.blue.opacity(0.12))
@@ -815,7 +815,9 @@ struct WalletCardView: View {
     let onToggleSelected: (Bool) -> Void
     let onPickImage: () -> Void
     let onClearImage: () -> Void
+    let onRename: () -> Void
     let onDelete: () -> Void
+    let isFocused: Bool
 
     @State private var copied = false
 
@@ -922,8 +924,16 @@ struct WalletCardView: View {
                 ))
                 .labelsHidden()
 
-                Text("Card #\(cardIndex + 1)")
-                    .font(.system(size: 13, weight: .semibold))
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(card.name ?? "Card #\(cardIndex + 1)")
+                        .lineLimit(1)
+                    if isFocused {
+                        Label("CURRENT CARD", systemImage: "scope")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.green)
+                    }
+                }
+                .font(.system(size: 13, weight: .semibold))
 
                 // Monospace Hash Pill with Copy Button
                 HStack(spacing: 4) {
@@ -956,6 +966,14 @@ struct WalletCardView: View {
                         .font(.system(size: 14))
                 }
 
+                Button(action: onRename) {
+                    Image(systemName: "pencil")
+                        .font(.system(size: 13))
+                        .foregroundStyle(.secondary)
+                        .frame(width: 30, height: 30)
+                }
+                .buttonStyle(.plain)
+
                 Button(role: .destructive, action: onDelete) {
                     Image(systemName: "trash")
                         .font(.system(size: 14))
@@ -976,6 +994,12 @@ struct WalletCardView: View {
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .stroke(card.isSelected ? Color.blue.opacity(0.35) : Color.clear, lineWidth: 1.5)
         )
+        .overlay {
+            if isFocused {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .stroke(Color.green, lineWidth: 3)
+            }
+        }
     }
 }
 
@@ -1001,6 +1025,8 @@ struct WalletCardsTab: View {
     @State private var isDocumentPickerPresented: Bool = false
     @State private var selectedPhotos: [PhotosPickerItem] = []
     @State private var showCredits = false
+    @State private var renameCardId: String? = nil
+    @State private var renameDraft: String = ""
 
     var body: some View {
         NavigationStack {
@@ -1104,6 +1130,19 @@ struct WalletCardsTab: View {
                     newHashText = ""
                     showAddSheet = false
                 }
+            }
+            .alert("Name This Card", isPresented: Binding(
+                get: { renameCardId != nil },
+                set: { if !$0 { renameCardId = nil } }
+            )) {
+                TextField("e.g. ICBC • 1234", text: $renameDraft)
+                Button("Save") {
+                    if let id = renameCardId { vm.renameCard(id: id, name: renameDraft) }
+                    renameCardId = nil
+                }
+                Button("Cancel", role: .cancel) { renameCardId = nil }
+            } message: {
+                Text("Use the bank name and last four digits. Full card numbers are neither needed nor stored.")
             }
             .confirmationDialog("Choose Image Source", isPresented: $showSourceDialog, titleVisibility: .visible) {
                 Button {
@@ -1227,10 +1266,15 @@ struct WalletCardsTab: View {
                         showSourceDialog = true
                     },
                     onClearImage: { vm.clearCardImage(for: card.id) },
+                    onRename: {
+                        renameDraft = card.name ?? ""
+                        renameCardId = card.id
+                    },
                     onDelete: {
                         UIImpactFeedbackGenerator(style: .medium).impactOccurred()
                         vm.deleteCard(id: card.id)
-                    }
+                    },
+                    isFocused: vm.focusedCardId == card.id
                 )
                 .id(card.id)
                 .transition(.asymmetric(
@@ -1323,7 +1367,7 @@ struct WalletCardsTab: View {
                     Text("3.")
                         .bold()
                         .foregroundStyle(.blue)
-                    Text("Your card will appear here automatically!")
+                    Text("Wait until that card gets the green **CURRENT CARD** badge. Only it will be selected for flashing.")
                 }
             }
             .font(.subheadline)

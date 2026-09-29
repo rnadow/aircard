@@ -38,6 +38,8 @@ final class AppViewModel: ObservableObject {
     @Published var cardFlashPhase: FlashPhase = .idle
     @Published var cardFlashProgress: Double = 0
     @Published var cardFlashLog: [String] = []
+    @Published var focusedCardId: String? = nil
+    @Published var focusedCardName: String? = nil
 
     enum FlashPhase: Equatable {
         case idle, running, done(ok: Bool)
@@ -115,6 +117,7 @@ final class AppViewModel: ObservableObject {
         "LumiCards.savedCards",
         "savedCards"
     ]
+    private let cardNamesStorageKey = "aircard.cardNames"
 
     init() {
         Self.shared = self
@@ -391,10 +394,20 @@ final class AppViewModel: ObservableObject {
     nonisolated static let cardRegexes: [NSRegularExpression] = [
         try! NSRegularExpression(pattern: "/(?:Cards|Passes/Cards)/([-A-Za-z0-9_+=]{20,44})(?:\\.pkpass|\\.cache|\\.pkcache|/|\\s|\"|'|\\)|,|$)"),
         try! NSRegularExpression(pattern: "/([-A-Za-z0-9_+=]{20,44})\\.(?:pkpass|cache|pkcache)"),
+        try! NSRegularExpression(pattern: #"(?i)(?:card[_\s]?(?:hash|id)|pass[_\s]?(?:hash|id)|(?:pass)?unique[_\s]?id(?:entifier)?)\s*[:=]\s*['\"]?([A-Za-z0-9+/=_-]{27,44})"#),
         try! NSRegularExpression(pattern: "(?<![A-Za-z0-9+/_-])([A-Za-z0-9+/_-]{27}=)(?![A-Za-z0-9+/_-])"),
         try! NSRegularExpression(pattern: #"PDCardFileManager: writing card\s+([A-Za-z0-9+/_-]+={0,2})(?=\s|\)|,|$)"#),
         try! NSRegularExpression(pattern: #"PDPassLibrary: wrote pass\s+([A-Za-z0-9+/_-]+={0,2})(?=\s|\)|,|$)"#),
         try! NSRegularExpression(pattern: #"VerificationCheck\.([A-Za-z0-9+/_-]+={0,2})(?=\s|\)|,|$)"#)
+    ]
+
+    nonisolated static let cardNameRegex = try! NSRegularExpression(
+        pattern: #"(?i)(?:localizedDescription|description|passName|organizationName|localizedName|displayName|title)\s*[:=]\s*['\"]([^'\"]{2,60})['\"]"#
+    )
+
+    nonisolated static let cardFocusMarkers = [
+        "dashboard loading", "didselect", "selected", "frontmost",
+        "tapped", "expanded"
     ]
 
 
@@ -428,7 +441,9 @@ final class AppViewModel: ObservableObject {
         t.disablesAnimations = true
         withTransaction(t) {
             isScanningCards = true
-            scanStatusText = "Open Apple Pay (double-click Side button) and tap your card…"
+            focusedCardId = nil
+            focusedCardName = nil
+            scanStatusText = "Open Wallet and tap the exact card you want. Wait for the CURRENT CARD badge."
         }
         log.append("Started live card scanner…")
 
@@ -526,6 +541,19 @@ final class AppViewModel: ObservableObject {
 
         guard isWalletContext else { return }
 
+        let isFocusEvent = Self.cardFocusMarkers.contains { lower.contains($0) }
+        var detectedName: String? = nil
+        if let match = Self.cardNameRegex.firstMatch(
+            in: line,
+            range: NSRange(line.startIndex..., in: line)
+        ), let range = Range(match.range(at: 1), in: line) {
+            let value = String(line[range]).trimmingCharacters(in: .whitespacesAndNewlines)
+            if !value.lowercased().contains("<private>") {
+                detectedName = value
+            }
+        }
+
+        var processed = Set<String>()
         for regex in Self.cardRegexes {
             let matches = regex.matches(in: line, range: NSRange(line.startIndex..., in: line))
             for m in matches {
@@ -533,12 +561,36 @@ final class AppViewModel: ObservableObject {
                     let candidateRaw = String(line[r])
                     guard let candidate = CardItem.cleanCardId(candidateRaw) else { continue }
                     if Self.dummyCardHashes.contains(candidate) { continue }
-                    if !self.cards.contains(where: { $0.id == candidate }) {
-                        self.cards.append(CardItem(id: candidate, isSelected: true))
+                    guard processed.insert(candidate).inserted else { continue }
+
+                    if let index = self.cards.firstIndex(where: { $0.id == candidate }) {
+                        if let detectedName, self.cards[index].name == nil {
+                            self.cards[index].name = detectedName
+                            self.saveCards()
+                        }
+                    } else {
+                        self.cards.append(CardItem(id: candidate, name: detectedName, isSelected: false))
                         self.saveCards()
                         self.scanStatusText = "Found card: \(candidate)"
                         self.log.append("Found card: \(candidate)")
                         UIImpactFeedbackGenerator(style: .heavy).impactOccurred()
+                    }
+
+                    // Generic cache/path events enumerate every card. Only a Wallet
+                    // focus event is strong enough to change the flash selection.
+                    if isFocusEvent {
+                        self.focusedCardId = candidate
+                        self.focusedCardName = detectedName ?? self.cards.first(where: { $0.id == candidate })?.name
+                        self.cards = self.cards.map {
+                            var card = $0
+                            card.isSelected = (card.id == candidate)
+                            return card
+                        }
+                        self.saveCards()
+                        let label = self.focusedCardName ?? "\(candidate.prefix(8))…\(candidate.suffix(6))"
+                        self.scanStatusText = "CURRENT CARD: \(label). Only this card is selected for flashing."
+                        self.log.append("Current Wallet card: \(label) [\(candidate)]")
+                        UINotificationFeedbackGenerator().notificationOccurred(.success)
                     }
                 }
             }
@@ -569,12 +621,13 @@ final class AppViewModel: ObservableObject {
                 unique.append(clean)
             }
         }
+        let names = UserDefaults.standard.dictionary(forKey: cardNamesStorageKey) as? [String: String] ?? [:]
         cards = unique.filter { !Self.dummyCardHashes.contains($0) }.map { id in
             let path = Self.cardImagePath(for: id)
             let data = try? Data(contentsOf: path)
             // Downsampled thumbnail keeps RAM minimal, preventing Jetsam OOM kills
             let img = data.flatMap { ImageEngine.safeImageFromData($0, maxDimension: 512) }
-            return CardItem(id: id, customImageData: data, customImage: img)
+            return CardItem(id: id, name: names[id], isSelected: false, customImageData: data, customImage: img)
         }
     }
 
@@ -592,6 +645,18 @@ final class AppViewModel: ObservableObject {
         UserDefaults.standard.set(hashes, forKey: "aircard.cards")
         UserDefaults.standard.set(hashes, forKey: "airlift.cards")
         UserDefaults.standard.set(hashes, forKey: "mak5er.savedCards")
+        let names = Dictionary(uniqueKeysWithValues: cards.compactMap { card in
+            card.name.map { (card.id, $0) }
+        })
+        UserDefaults.standard.set(names, forKey: cardNamesStorageKey)
+    }
+
+    func renameCard(id: String, name: String) {
+        guard let index = cards.firstIndex(where: { $0.id == id }) else { return }
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        cards[index].name = trimmed.isEmpty ? nil : trimmed
+        if focusedCardId == id { focusedCardName = cards[index].name }
+        saveCards()
     }
 
     func setSkinForAllCards(image: UIImage) {

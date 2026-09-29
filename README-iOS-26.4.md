@@ -53,6 +53,9 @@ it does not alter payment credentials or bank-side card data.
 
 Some iOS 26 builds do not expose the on-device pairing request under Developer
 Mode. Version 1.3.2 adds an **Import Pairing Record** action to the Pairing tab.
+Version 1.3.3 adds focused-card detection for multi-card Wallets: opening a
+specific card marks it as **CURRENT CARD**, selects only that hash for flashing,
+and allows a local bank/last-four label to be saved for future identification.
 Generate/export a trusted record on the user's Mac or from an existing
 sideloading setup, then select its `.plist`, `.mobiledevicepairing`, or
 `.mobilepair` file. Pairing records are device credentials and must never be
