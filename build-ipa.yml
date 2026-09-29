@@ -1,0 +1,47 @@
+name: Build unsigned iOS IPA
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build AirCard-iOS 26.4 experimental
+    runs-on: macos-15
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Show Apple toolchain
+        run: |
+          sw_vers
+          xcodebuild -version
+          swift --version
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Build unsigned IPA
+        run: |
+          chmod +x build-ipa.sh
+          ./build-ipa.sh Release
+
+      - name: Verify package
+        run: |
+          test -s build/AirCard-iOS.ipa
+          unzip -t build/AirCard-iOS.ipa
+          shasum -a 256 build/AirCard-iOS.ipa | tee build/AirCard-iOS.ipa.sha256
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AirCard-iOS-26.4-unsigned
+          path: |
+            build/AirCard-iOS.ipa
+            build/AirCard-iOS.ipa.sha256
+          if-no-files-found: error
+          retention-days: 14
